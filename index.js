@@ -85,29 +85,35 @@ async function run() {
       const result = await usersCollection.insertOne(user);
       res.send(result);
     });
-    app.patch('/users/admin/:id', async (req, res) => {
-      const id = req.params.id;
-      const filter = { _id: new ObjectId(id) };
     
-      const user = await usersCollection.findOne(filter);
-    
-      if (!user) {
-        return res.status(404).json({ message: 'User not found' });
+  app.patch('/users/:role/:id', async (req, res) => {
+  try {
+    const { role, id } = req.params;
+    const validRoles = ['admin', 'instructor'];
+
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+
+    const filter = { _id: new ObjectId(id) };
+    const updateDoc = {
+      $set: {
+        role: role
       }
-    
-      const newRole = user.role === 'admin' ? 'instructor' : 'admin';
-    
-      const updateDoc = {
-        $set: {
-          role: newRole,
-        },
-      };
-    
+    };
 
-      const result = await usersCollection.updateOne(filter, updateDoc);
-      res.send(result);
+    const result = await usersCollection.updateOne(filter, updateDoc);
+    if (result.modifiedCount === 1) {
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ error: 'User not found' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
-    })
     app.get('/users/admin/:email', verifyJWT, async (req, res) => {
       const email = req.params.email;
 
@@ -120,6 +126,32 @@ async function run() {
       const result = { admin: user?.role === 'admin' }
       res.send(result);
     })
+
+    app.get('/users/instructor/:email', verifyJWT, async (req, res) => {
+      const email = req.params.email;
+
+      if (req.decoded.email !== email) {
+        res.send({ instructor: false })
+      }
+
+      const query = { email: email }
+      const user = await usersCollection.findOne(query);
+      const result = { instructor : user?.role === 'instructor' }
+      res.send(result);
+    })
+    app.get('/users/student/:email', verifyJWT, async (req, res) => {
+      const email = req.params.email;
+
+      if (req.decoded.email !== email) {
+        res.send({ student: false })
+      }
+
+      const query = { email: email }
+      const user = await usersCollection.findOne(query);
+      const result = { student: user?.role === 'student' }
+      res.send(result);
+    })
+
     app.delete('/users/:id', async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -131,6 +163,84 @@ async function run() {
         const result = await classesCollection.find().toArray();
         res.send(result);
     })
+    app.get('/classes/:id', async(req, res) =>{
+      const result = await classesCollection.find().toArray();
+      res.send(result);
+  })
+  app.get('/classes/:id', async (req, res) => {
+    const { id } = req.params;
+  
+    try {
+      const classData = await classesCollection.findOne({ _id: new ObjectId(id) });
+  
+      if (classData) {
+        res.send(classData);
+      } else {
+        res.status(404).json({ error: 'Class not found' });
+      }
+    } catch (error) {
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+    app.get("/classes", async (req, res) => {
+      const email = req.query.email;
+    
+      if (!email) {
+        return res.send([]);
+      }
+    
+      const decodedEmail = req.decoded.email;
+      if (email !== decodedEmail) {
+        return res.status(403).send({ error: true, message: "Forbidden access" });
+      }
+    
+      try {
+        const query = { email: email };
+        const result = await classesCollection.find(query).toArray();
+        res.send(result);
+      } catch (error) {
+        console.error("Error fetching classes:", error);
+        res.status(500).send({ error: true, message: "Internal server error" });
+      }
+    });
+    app.patch('/updateClass/:id', async (req, res) => {
+      const id = req?.params?.id;
+      const updatedToy = req.body;
+      
+      try {
+        if (id) {
+          const filter = { _id: new ObjectId(id) };
+          const updateDoc = {
+            $set: {
+              ...updatedToy
+            }
+          };
+          
+          const result = await classesCollection.updateOne(filter, updateDoc);
+          res.send(result);
+        } else {
+          res.status(400).send('Invalid toy ID');
+        }
+      } catch (error) {
+        res.status(500).send(error.message);
+      }
+    });
+
+    
+    app.delete("/classes/:id", async (req, res) => {
+      const id = req.params.id;
+    
+      try {
+        const result = await classesCollection.deleteOne({ _id: id });
+        res.send({ deletedCount: result.deletedCount });
+      } catch (error) {
+        console.error("Error deleting class:", error);
+        res.status(500).send({ error: true, message: "Internal server error" });
+      }
+    });
+    
+
     app.post('/classes', async (req, res) => {
       const newItem = req.body;
       const result = await classesCollection.insertOne(newItem)
@@ -149,7 +259,7 @@ async function run() {
 
       const decodedEmail = req.decoded.email;
       if(email !== decodedEmail){
-        return res.status(403).send({ error: true, message: 'forviden access' })
+        return res.status(403).send({ error: true, message: 'forbidden access' })
       }
       const query = { email: email };
       const result = await cartsCollection.find(query).toArray();
@@ -161,6 +271,7 @@ async function run() {
       const result = await cartsCollection.insertOne(item);
       res.send(result);
     })
+
     app.delete('/carts/:id', async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
