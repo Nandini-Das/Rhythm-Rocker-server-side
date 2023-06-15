@@ -6,7 +6,6 @@ require('dotenv').config()
 const stripe = require('stripe')(process.env.PAYMENT_SECRET_KEY)
 const port = process.env.PORT || 5000;
 
-
 // middleware
 app.use(cors());
 app.use(express.json());
@@ -201,50 +200,48 @@ async function run() {
 });
 
 
-    app.get("/classes", async (req, res) => {
-      const email = req.query.email;
-    
-      if (!email) {
-        return res.send([]);
-      }
-    
-      const decodedEmail = req.decoded.email;
-      if (email !== decodedEmail) {
-        return res.status(403).send({ error: true, message: "Forbidden access" });
-      }
-    
+  
+    app.get('/classes', async (req, res) => {
       try {
-        const query = { email: email };
-        const result = await classesCollection.find(query).toArray();
-        res.send(result);
+        const classes = await classesCollection.find().toArray();
+        res.status(200).json(classes);
       } catch (error) {
-        console.error("Error fetching classes:", error);
-        res.status(500).send({ error: true, message: "Internal server error" });
+        res.status(500).json({ message: 'Error fetching classes', error: error.message });
       }
     });
-    app.patch('/updateClass/:id', async (req, res) => {
-      const id = req?.params?.id;
-      const updatedToy = req.body;
-      
+    
+    app.patch('/classes/:id', async (req, res) => {
       try {
-        if (id) {
-          const filter = { _id: new ObjectId(id) };
-          const updateDoc = {
-            $set: {
-              ...updatedToy
-            }
-          };
-          
-          const result = await classesCollection.updateOne(filter, updateDoc);
-          res.send(result);
+        const { status, feedback } = req.body;
+        const { id } = req.params;
+        const validStatus = ['approved', 'denied'];
+        const sendFeedback = ['   '];
+    
+        if (!validStatus.includes(status) || !sendFeedback.includes(feedback)) {
+          return res.status(400).json({ error: 'Invalid status or feedback' });
+        }
+        
+        const filter = { _id: new ObjectId(id) };
+        const updateDoc = {
+          $set: {
+            status: status,
+            feedback: feedback,
+          },
+        };
+    console.log(feedback)
+        const result = await classesCollection.updateOne(filter, updateDoc);
+    
+        if (result.modifiedCount === 1) {
+          res.json({ success: true });
         } else {
-          res.status(400).send('Invalid toy ID');
+          res.status(404).json({ error: 'Class not found' });
         }
       } catch (error) {
-        res.status(500).send(error.message);
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
       }
     });
-
+    
     
     app.delete("/classes/:id", async (req, res) => {
       const id = req.params.id;
@@ -296,6 +293,24 @@ async function run() {
       const result = await cartsCollection.deleteOne(query);
       res.send(result);
     })
+    app.patch('/classes/:id', async (req, res) => {
+      try {
+        const classId = req.params.id;
+        const { available_seats } = req.body;
+    
+        // Update the class in the database
+        const updatedClass = await classesCollection.findByIdAndUpdate(classId, { available_seats }, { new: true });
+    
+        if (!updatedClass) {
+          return res.status(404).json({ error: 'Class not found' });
+        }
+    
+        return res.json(updatedClass);
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+      }
+    });
 
     app.post('/create-payment-intent', async (req, res) => {
       const { price } = req.body;
@@ -315,6 +330,10 @@ async function run() {
       const item = req.body;
       const result = await paymentsCollection.insertOne(item);
       res.send(result);
+    })
+    app.get('/payment', async(req, res) =>{
+        const result = await paymentsCollection.find().toArray();
+        res.send(result);
     })
     
     // Send a ping to confirm a successful connection
