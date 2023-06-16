@@ -293,25 +293,37 @@ async function run() {
       const result = await cartsCollection.deleteOne(query);
       res.send(result);
     })
-    app.patch('/classes/:id', async (req, res) => {
-      try {
-        const classId = req.params.id;
-        const { available_seats } = req.body;
+    app.patch('/classes/:id', (req, res) => {
+      const { id } = req.params;
+      const { available_seats } = req.body;
     
-        // Update the class in the database
-        const updatedClass = await classesCollection.findByIdAndUpdate(classId, { available_seats }, { new: true });
-    
-        if (!updatedClass) {
-          return res.status(404).json({ error: 'Class not found' });
-        }
-    
-        return res.json(updatedClass);
-      } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Server error' });
+      // Validate input
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).json({ error: 'Invalid class ID' });
       }
+    
+      // Assuming you have a MongoDB connection
+      const classesCollection = db.collection('classes');
+    
+      // Update the class document
+      classesCollection
+        .updateOne(
+          { _id: ObjectId(id) },
+          { $set: { available_seats: available_seats } }
+        )
+        .then((result) => {
+          if (result.modifiedCount === 1) {
+            res.json({ success: true });
+          } else {
+            res.status(404).json({ error: 'Class not found' });
+          }
+        })
+        .catch((error) => {
+          console.error(error);
+          res.status(500).json({ error: 'Internal server error' });
+        });
     });
-
+  
     app.post('/create-payment-intent', async (req, res) => {
       const { price } = req.body;
       const amount = price * 100;
@@ -336,12 +348,11 @@ async function run() {
         res.send(result);
     })
     
-    // Send a ping to confirm a successful connection
+    
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
-    // Ensures that the client will close when you finish/error
-    //await client.close();
+    
   }
 }
 run().catch(console.dir);
