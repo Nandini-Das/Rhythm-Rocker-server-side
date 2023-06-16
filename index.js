@@ -183,22 +183,9 @@ async function run() {
       res.status(500).json({ error: 'Internal server error' });
     }
   });
- // create payment intent
- app.post('/create-payment-intent', verifyJWT, async (req, res) => {
-  const { price, description } = req.body;
-  const amount = price * 100;
-  const paymentIntent = await stripe.paymentIntents.create({
-    amount: amount,
-    currency: 'usd',
-    description: description, 
-    payment_method_types: ['card']
-  });
-
-  res.send({
-    clientSecret: paymentIntent.client_secret
-  });
-});
-
+ 
+  // create payment intent
+ 
 
   
     app.get('/classes', async (req, res) => {
