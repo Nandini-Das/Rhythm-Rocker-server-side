@@ -41,7 +41,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    
     const usersCollection = client.db("rhythmdb").collection("users");
     const classesCollection = client.db("rhythmdb").collection("classes");
     const instructorsCollection = client.db("rhythmdb").collection("instructors");
@@ -185,7 +185,21 @@ async function run() {
   });
  
   // create payment intent
- 
+ app.post('/create-payment-intent', verifyJWT, async (req, res) => {
+  const { price, description } = req.body;
+  const amount = price * 100;
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: amount,
+    currency: 'usd',
+    description: description, 
+    payment_method_types: ['card']
+  });
+
+  res.send({
+    clientSecret: paymentIntent.client_secret
+  });
+});
+
 
   
     app.get('/classes', async (req, res) => {
